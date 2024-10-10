@@ -1,0 +1,114 @@
+% Always begin by using addpath
+% You can always test your algorithm in simulator
+% addpath("../simulator")
+
+% Add the ARUCO detector
+% Check the example in the folder
+addpath("arucoDetector")
+addpath("arucoDetector/include")
+addpath("arucoDetector/dictionary")
+
+% Load parameters
+load('arucoDetector/dictionary/arucoDict.mat');
+load("calibrationSession.mat")
+marker_length = 0.070;
+
+cameraParams = calibrationSession.CameraParameters;
+
+% Initialize the pibot connection
+pb = PiBot('192.168.50.1');
+
+% Initialise your EKF class
+EKF = ekf_slam();
+
+blackPixelThreshold = 90;        % Minimum number of black pixels to consider the line as present
+consecutiveThreshold = 5;        % Number of consecutive frames below the threshold to confirm end of line
+belowThresholdCount = 0;         % Counter for consecutive frames below the threshold
+tic;
+
+figure;
+robotPlot = plot(0, 0, 'ro', 'MarkerSize', 10, 'MarkerFaceColor', 'r');
+hold on;
+landmarkPlot = plot(0, 0, 'b*', 'MarkerSize', 8);
+xlim([0, 4]);
+ylim([0, 4]);
+grid on;
+title('Robot and Landmark Positions');
+xlabel('X (m)');
+ylabel('Y (m)');
+
+
+
+% INITIAL STATE
+u = 0;
+q = 0;
+
+while(true)
+    dt = toc;
+    tic;
+
+    % EKF PREDICT
+    EKF.predict(dt, u, q);
+
+    % Get the current camera frame
+    img = pb.getImage();
+
+    % measure landmarks and update EKF
+    [marker_nums, landmark_centres, ~] = detectArucoPoses(img, marker_length, cameraParams, arucoDict);
+
+    if ~isempty(marker_nums)
+        % Prepare measurements (only x and y components in robot frame)
+        measurements = landmark_centres(:, 1:2);
+
+        % Filter out markers with IDs >= 30 (if necessary)
+        valid_indices = marker_nums < 50;
+        marker_nums = marker_nums(valid_indices);
+        measurements = measurements(valid_indices, :);
+
+        % Call EKF input_measurements
+        if ~isempty(marker_nums)
+            EKF.update(measurements, marker_nums);
+        end
+
+        % Get estimates from EKF
+        [robot_est, ~] = EKF.output_robot();
+        [landmarks_est, cov] = EKF.output_landmarks();
+
+        % Update the plot
+        set(robotPlot, 'XData', robot_est(1), 'YData', robot_est(2));
+        % set(landmarkPlot, 'XData', landmarks_est(:,1), 'YData', landmarks_est(:,2));
+        drawnow;
+    end
+    % Binarize the image with a threshold
+    gray_img = rgb2gray(img);
+    bin_img = ~imbinarize(gray_img, 0.4);
+
+    % Crop the binary image to the bottom third for line detection
+    [height, width] = size(bin_img);
+    bottom_third_bin_img = bin_img(round(2*height/3):end, :);
+
+    % Count the number of black pixels in the cropped image
+    blackPixelCount = sum(bottom_third_bin_img(:));
+
+    % Update the consecutive frame counter based on blackPixelCount
+    if blackPixelCount < blackPixelThreshold
+        belowThresholdCount = belowThresholdCount + 1;
+    else
+        belowThresholdCount = 0; % Reset if the count is above threshold
+    end
+
+    % Check if the robot has reached the end of the line
+    if belowThresholdCount >= consecutiveThreshold
+        break;
+    end
+    % line follow module
+    [u, q, wl, wr] = followLineIteration(height, width, bottom_third_bin_img);
+
+    pb.setVelocity(wl, wr);
+    
+end
+
+% END LINE FOLLOW
+pb.stop();
+
+

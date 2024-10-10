@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "lab3slam",
+			"path": "."
+		},
+		{
+			"name": "arucoDetector",
+			"path": "../lab2robotcontrol/arucoDetector"
+		}
+	],
+	"settings": {}
+}
