@@ -1,6 +1,6 @@
 % Always begin by using addpath
 % You can always test your algorithm in simulator
-% addpath("../simulator")
+addpath("simulator")
 
 % Add the ARUCO detector
 % Check the example in the folder
@@ -15,8 +15,21 @@ marker_length = 0.070;
 
 cameraParams = calibrationSession.CameraParameters;
 
+simulation = true;
+
 % Initialize the pibot connection
-pb = PiBot('192.168.50.1');
+
+if simulation
+    pb = piBotSim("floor_course.jpg");
+    % Start by placing your robot at the start of the line
+    x0 = 1;
+    y0 = 1;
+    theta0 = 0;
+    pb.place([x0;y0], theta0);
+    pb.showLandmarks(true);
+else
+    pb = PiBot('192.168.50.1');
+end
 
 % Initialise your EKF class
 EKF = ekf_slam();
@@ -37,8 +50,6 @@ title('Robot and Landmark Positions');
 xlabel('X (m)');
 ylabel('Y (m)');
 
-
-
 % INITIAL STATE
 u = 0;
 q = 0;
@@ -54,16 +65,22 @@ while(true)
     img = pb.getImage();
 
     % measure landmarks and update EKF
-    [marker_nums, landmark_centres, ~] = detectArucoPoses(img, marker_length, cameraParams, arucoDict);
+    if simulation
+        [landmark_centres, marker_nums] = pb.measureLandmarks();
+    else
+        [marker_nums, landmark_centres, ~] = detectArucoPoses(img, marker_length, cameraParams, arucoDict);
+    end
 
     if ~isempty(marker_nums)
-        % Prepare measurements (only x and y components in robot frame)
-        measurements = landmark_centres(:, 1:2);
+        n_markers = length(marker_nums);
 
-        % Filter out markers with IDs >= 30 (if necessary)
-        valid_indices = marker_nums < 50;
+        % Filter out markers with IDs >= 30
+        valid_indices = marker_nums < 30;
         marker_nums = marker_nums(valid_indices);
-        measurements = measurements(valid_indices, :);
+
+        % Prepare measurements (only x and y components in robot frame)
+        measurements = landmark_centres(:, valid_indices);
+        measurements = measurements(:, 1:min(length(marker_nums), 2));
 
         % Call EKF input_measurements
         if ~isempty(marker_nums)
