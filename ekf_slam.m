@@ -6,9 +6,9 @@ classdef ekf_slam < handle
         P = zeros(3,3); % The estimated state covariance
 
         % The covariance values provided here are NOT correct!
-        sigxy = 0.1; % The covariance of linear velocity
+        sigxy = 0.01; % The covariance of linear velocity
         sigth = 0.01; % The covariance of angular velocity
-        siglm = 0.01; % The covariance of landmark measurements
+        siglm = 0.1; % The covariance of landmark measurements
 
         % R = [siglm, 0; 0, siglm]; % Covariance matrix for landmark measurements
 
@@ -28,8 +28,11 @@ classdef ekf_slam < handle
             % Add the NxN identity matrix to the diagonal of A (where N is the number of landmarks)
             
             A = [A, zeros(3, 2*obj.n); zeros(2*obj.n, 3), eye(2*obj.n)];
+            
+            B_k = [dt*cos(obj.x(3)), 0; dt*sin(obj.x(3)), 0; 0, dt; zeros(2*obj.n, 2)];
+            Q_k = [obj.sigxy, 0; 0, obj.sigth];
 
-            obj.P = A * obj.P * A';
+            obj.P = A * obj.P * A' + B_k * Q_k * B_k';
 
         end
 
@@ -75,7 +78,7 @@ classdef ekf_slam < handle
                     obj.x = [obj.x; y(:,i)];
                     
                     % Expand covariance matrix using blkdiag
-                    obj.P = blkdiag(obj.P, diag([obj.siglm, obj.siglm]));
+                    obj.P = blkdiag(obj.P, diag([obj.siglm*10, obj.siglm*10]));
                     
                     % Update landmark count and index mapping
                     obj.n = obj.n + 1;
@@ -115,7 +118,7 @@ classdef ekf_slam < handle
             % Suggested: output the part of the state vector and covariance
             % matrix corresponding only to the landmarks.
             landmarks = reshape(obj.x(4:end), 2, []);
-            cov = reshape(diag(obj.P(4:end, 4:end)), 2, []);
+            cov = obj.P(4:end, 4:end);
         end
 
         function y = meas2y(obj,measurements)

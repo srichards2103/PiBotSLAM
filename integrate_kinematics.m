@@ -8,6 +8,7 @@ function new_state = integrate_kinematics(state, dt, lin_velocity, ang_velocity)
 
     u = lin_velocity;
     q = ang_velocity;
+    
     theta = state(3, 1);
     
     if q == 0

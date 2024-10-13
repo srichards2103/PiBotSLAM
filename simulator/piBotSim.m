@@ -28,7 +28,7 @@ classdef piBotSim < handle
     % Static parameters of the world and robot
     properties(Constant)
         simTimeStep = 0.1; % The duration of each step of the simulator (s).
-        robotWheelVelScale = 5.33e-3; % The scaling applied to wheel velocities (tk/s).
+        robotWheelVelScale = 5.43e-3; % The scaling applied to wheel velocities (tk/s).
         robotWheelVelNoise = 2.0/50; % Variance of the Gaussian noise added to the wheel velocities.
         robotMeasureNoisePosition = 0.005; % Variance of the Gaussian noise added to position measurements.
         robotMeasureNoiseAngle = 0.08; % Variance of the Gaussian noise added to angle measurements.
