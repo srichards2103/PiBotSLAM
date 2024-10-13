@@ -43,40 +43,44 @@ classdef ekf_slam < handle
             
             % transform measurements to ref frame
             world_measurements = obj.meas2y(measurements);
+            % augment state vector and covariance matrix with new landmarks 
+            % before performing the update step
             obj.add_new_landmarks(world_measurements, nums);
 
             idx = find(ismember(obj.idx2num, nums));
 
             C_k = jac_h(obj.x, idx);
-            R_k = [obj.siglm, 0; 0, obj.siglm]; % Covariance matrix for landmark measurements
+            R_k = obj.P(3+[2*(idx-1)+1, 2*(idx-1)+2], 3+[2*(idx-1)+1, 2*(idx-1)+2]); % Covariance matrix for landmark measurements
             
-            disp('Matrix sizes:');
-            disp(['obj.P: ', mat2str(size(obj.P)), ', C_k: ', mat2str(size(C_k)), ...
-                  ', obj.x: ', mat2str(size(obj.x)), ', world_measurements: ', mat2str(size(world_measurements))]);
-            disp('Desired Matrix sizes:');
-            disp(['A: ', mat2str([3+2*obj.n,3+2*obj.n]), ...
-            ', C: ', mat2str([2*length(idx),3+2*obj.n])]);
+            % disp('Matrix sizes:');
+            % disp(['obj.P: ', mat2str(size(obj.P)), ', C_k: ', mat2str(size(C_k)), ...
+            %       ', obj.x: ', mat2str(size(obj.x)), ', world_measurements: ', mat2str(size(world_measurements))]);
+            % disp('Desired Matrix sizes:');
+            % disp(['A: ', mat2str([3+2*obj.n,3+2*obj.n]), ...
+            % ', C: ', mat2str([2*length(idx),3+2*obj.n])]);
 
             % From lecture Notes:
             K = obj.P * C_k' / (C_k * obj.P * C_k' + R_k); % Kalman Gain
-            
-            obj.x = obj.x + K * (world_measurements - h(obj.x, idx)); % Update State
+
+            obj.x = obj.x + K * (world_measurements(:) - h(obj.x, idx)); % Update State
             obj.P = obj.P - K * C_k * obj.P; % Update Covariance
 
         end
         
         function add_new_landmarks(obj, y, nums)
-            % Add a new (not seen before) landmark to the state vector and
-            % covariance matrix. You will need to associate the landmark's
-            % id number with its index in the state vector.
-            for num = nums(~(ismember(nums, obj.idx2num)))
-                obj.x = [obj.x; y(:)];
-
-                obj.P(3+2*obj.n+1,3+2*obj.n+1) = obj.siglm;
-                obj.P(3+2*obj.n+2,3+2*obj.n+2) = obj.siglm;
-
-                obj.n = obj.n+1;
-                obj.idx2num = [obj.idx2num,num];
+            % Add new (not seen before) landmarks to the state vector and covariance matrix
+            for i = 1:length(nums)
+                if ~ismember(nums(i), obj.idx2num)
+                    % Add new landmark to state vector
+                    obj.x = [obj.x; y(:,i)];
+                    
+                    % Expand covariance matrix using blkdiag
+                    obj.P = blkdiag(obj.P, diag([obj.siglm, obj.siglm]));
+                    
+                    % Update landmark count and index mapping
+                    obj.n = obj.n + 1;
+                    obj.idx2num = [obj.idx2num, nums(i)];
+                end
             end
         end
 
@@ -110,8 +114,8 @@ classdef ekf_slam < handle
         function [landmarks, cov] = output_landmarks(obj)
             % Suggested: output the part of the state vector and covariance
             % matrix corresponding only to the landmarks.
-            landmarks = obj.x(4:end);
-            cov = obj.P(4:end, 4:end);
+            landmarks = reshape(obj.x(4:end), 2, []);
+            cov = reshape(diag(obj.P(4:end, 4:end)), 2, []);
         end
 
         function y = meas2y(obj,measurements)
@@ -159,8 +163,8 @@ function y = h(x, idx)
     for i = 1:m
         % Retrieve the corresponding l_ix and l_iy based on idx
         % Get the index of idx in obj.idx2num
-        l_ix = x(3+idx(i));  % x-offset for index i
-        l_iy = x(3+idx(i) + 1);  % y-offset for index i
+        l_ix = x(3+2*(idx(i)-1)+1);  % x-offset for index i
+        l_iy = x(3+2*(idx(i)-1)+2);  % y-offset for index i
 
         % Compute the transformed position using the formula from the image
         h_x = -cos(theta_k) * (x_k - l_ix) - sin(theta_k) * (y_k - l_iy);
@@ -187,7 +191,7 @@ function H = jac_h(x, idx)
 
     % Initialize the full Jacobian matrix H (2m x (3 + 2N))
     H = zeros(2 * m, 3 + 2 * N);
-    disp(size(H))
+
     % Loop through each observed landmark index
     for i = 1:m
         % Retrieve the corresponding landmark offsets l_ix and l_iy
@@ -208,7 +212,6 @@ function H = jac_h(x, idx)
 
         % Fill in the zeros for the other entries, except the identity for the landmark part
         H(2*i-1:2*i, 3 + 2*(i-1) + 1:3 + 2*i) = [cos(theta_k), sin(theta_k); -sin(theta_k), cos(theta_k)];
-        disp(size(H))
     end
 end
 
