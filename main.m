@@ -51,7 +51,7 @@ xlabel('X (m)');
 ylabel('Y (m)');
 
 % Initialize visualization data struct
-vis_data = struct('time', {}, 'robot_pos', {}, 'robot_cov', {}, 'landmark_pos', {}, 'landmark_cov', {});
+vis_data = struct('time', {}, 'robot_pos', {}, 'robot_cov', {}, 'landmark_pos', {}, 'landmark_cov', {}, 'landmark_nums', {});
 
 % INITIAL STATE
 u = 0;
@@ -78,7 +78,7 @@ while(true)
     end
 
     % Filter out markers with IDs >= 30 and those more than 2m away
-    valid_markers = (marker_nums < 30) & (vecnorm(landmark_centres) <= 2);
+    valid_markers = (marker_nums < 30) & (vecnorm(landmark_centres) <= 1);
     marker_nums = marker_nums(valid_markers);
     landmark_centres = landmark_centres(:, valid_markers);
 
@@ -89,14 +89,18 @@ while(true)
         % Get estimates from EKF
         [robot_est, robot_cov] = EKF.output_robot();
         [landmarks_est, landmarks_cov] = EKF.output_landmarks();
+        
+        % Get the idx2num array from EKF
+        idx2num = EKF.idx2num;
 
         % Store data for visualization
         current_time = toc(start_time);
         vis_data(end+1).time = current_time;
-        vis_data(end).robot_pos = robot_est(1:2);
+        vis_data(end).robot_pos = robot_est(1:3);
         vis_data(end).robot_cov = robot_cov(1:2, 1:2);
         vis_data(end).landmark_pos = landmarks_est;
         vis_data(end).landmark_cov = landmarks_cov;
+        vis_data(end).landmark_nums = idx2num;  % Store all landmark numbers using idx2num
 
         % Update the plot
         set(robotPlot, 'XData', robot_est(1), 'YData', robot_est(2));
@@ -129,6 +133,7 @@ while(true)
     
     % line follow module
     [u, q, wl, wr] = followLineIteration(height, width, bottom_third_bin_img);
+    disp([wl,wr]);
 
     pb.setVelocity(wl, wr);
     

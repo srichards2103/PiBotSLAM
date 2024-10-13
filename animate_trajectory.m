@@ -9,6 +9,7 @@ function animate_trajectory(vis_data)
     hold on;
     robot_plot = plot(NaN, NaN, 'ro', 'MarkerSize', 10, 'MarkerFaceColor', 'none');
     landmark_plots = cell(1, 30);  % Assuming maximum of 30 landmarks
+    landmark_labels = cell(1, 30);  % New: Text objects for landmark numbers
     
     % Set axis limits
     xlim([-1, 5]);
@@ -34,10 +35,13 @@ function animate_trajectory(vis_data)
         % Update landmark positions and covariances
         landmark_pos = vis_data(frame).landmark_pos;
         landmark_cov = vis_data(frame).landmark_cov;
+        landmark_nums = vis_data(frame).landmark_nums;  % New: Get landmark numbers
         
         for i = 1:size(landmark_pos, 2)
             if isempty(landmark_plots{i})
                 landmark_plots{i} = plot(NaN, NaN, 'o', 'Color', cmap(i,:), 'MarkerSize', 8, 'MarkerFaceColor', 'none');
+                % New: Create text object for landmark number
+                landmark_labels{i} = text(NaN, NaN, '', 'Color', cmap(i,:), 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
             end
             
             % Calculate landmark marker size based on covariance
@@ -45,6 +49,9 @@ function animate_trajectory(vis_data)
             landmark_size = 8 + 200 * sqrt(trace(landmark_cov_i));
             
             set(landmark_plots{i}, 'XData', landmark_pos(1,i), 'YData', landmark_pos(2,i), 'MarkerSize', landmark_size);
+            
+            % New: Update text position and content
+            set(landmark_labels{i}, 'Position', [landmark_pos(1,i), landmark_pos(2,i)], 'String', num2str(landmark_nums(i)));
         end
         
         % Update title with current time
