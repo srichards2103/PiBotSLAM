@@ -43,8 +43,8 @@ figure;
 robotPlot = plot(0, 0, 'ro', 'MarkerSize', 10, 'MarkerFaceColor', 'r');
 hold on;
 landmarkPlot = plot(0, 0, 'b*', 'MarkerSize', 8);
-xlim([-1, 5]);
-ylim([-1, 5]);
+xlim([0, 5]);
+ylim([0, 5]);
 grid on;
 title('Robot and Landmark Positions');
 xlabel('X (m)');
@@ -127,12 +127,24 @@ while(true)
     end
 
     % Check if the robot has reached the end of the line
-    if belowThresholdCount >= consecutiveThreshold
+    if current_time > 20
         break;
+    elseif belowThresholdCount <= consecutiveThreshold
+        [u, q, wl, wr] = followLineIteration(height, width, bottom_third_bin_img);
+    else
+        u = 0;
+        q = 0.8;
+        % Calculate wheel velocities using inverse kinematics
+        [wl, wr] = inverse_kinematics(u, q);
+
+        % Helper function to round wheel velocities to the nearest lower multiple of 5
+        round_to_lower_5 = @(value) 5 * floor(value / 5);
+        wl = round_to_lower_5(wl);
+        wr = round_to_lower_5(wr);
+
+        % Calculate the actual velocities after rounding
+        [u, q] = forward_kinematics(wl, wr);
     end
-    
-    % line follow module
-    [u, q, wl, wr] = followLineIteration(height, width, bottom_third_bin_img);
 
     pb.setVelocity(wl, wr);
     
@@ -143,6 +155,11 @@ pb.stop();
 
 % Save visualization data to a file
 save('visualization_data.mat', 'vis_data');
+
+% evaluate landmark estimates
+rms_error = evaluate_landmarks(vis_data, simulation, pb);
+disp("Landmark position RMS error: ");
+disp(rms_error);
 
 % plot the trajectory
 plot_trajectory(vis_data);
