@@ -23,7 +23,7 @@ function plot_trajectory(vis_data)
         uncertainty = sqrt(trace(pos_cov));
         
         % Scale circle size based on uncertainty (adjust scaling factor as needed)
-        circle_size = 20 + 100 * uncertainty;
+        circle_size = 5 + 1000 * uncertainty;
         
         % Plot each position with color based on time, size based on uncertainty, and partial transparency
         scatter(robot_positions(1,i), robot_positions(2,i), circle_size, colors(i,:), 'filled', 'MarkerFaceAlpha', 0.5);
@@ -40,7 +40,7 @@ function plot_trajectory(vis_data)
             end
             
             % Check if we've already plotted this landmark a few times
-            if plotted_landmarks(j) >= 10
+            if plotted_landmarks(j) >= 20
                 continue;  % Skip this landmark if we've already plotted it 10 times
             end
             
@@ -49,10 +49,10 @@ function plot_trajectory(vis_data)
             lm_uncertainty = sqrt(trace(lm_cov));
             
             % Scale marker size based on uncertainty
-            lm_size = 20 + 100 * lm_uncertainty;
+            lm_size = 1000 * lm_uncertainty;
             
             % Plot landmark estimate with size based on uncertainty
-            scatter(landmark_pos(1,j), landmark_pos(2,j), lm_size, 'b*', 'MarkerEdgeAlpha', 0.5);
+            scatter(landmark_pos(1,j), landmark_pos(2,j), lm_size, 'b+', 'MarkerEdgeAlpha', 0.5);
             
             % Increment the count for this landmark
             plotted_landmarks(j) = plotted_landmarks(j) + 1;
