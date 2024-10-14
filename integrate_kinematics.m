@@ -8,6 +8,7 @@ function new_state = integrate_kinematics(state, dt, lin_velocity, ang_velocity)
 
     u = lin_velocity;
     q = ang_velocity;
+    
     theta = state(3, 1);
     
     if q == 0
@@ -15,9 +16,10 @@ function new_state = integrate_kinematics(state, dt, lin_velocity, ang_velocity)
         y = state(2, 1) + u * dt * sin(theta);
     else
         x = state(1, 1) + u/q * (sin(theta + q * dt) - sin(theta));
-        y = state(2, 1) + u/q * (cos(theta) - cos(theta + q * dt));
+        y = state(2, 1) - u/q * (cos(theta + q * dt) - cos(theta));
     end
     
     theta = theta + dt * q;
+    
     new_state = [x; y; theta];
 end

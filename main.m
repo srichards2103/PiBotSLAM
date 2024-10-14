@@ -1,6 +1,6 @@
 % Always begin by using addpath
 % You can always test your algorithm in simulator
-% addpath("../simulator")
+addpath("simulator")
 
 % Add the ARUCO detector
 % Check the example in the folder
@@ -15,8 +15,21 @@ marker_length = 0.070;
 
 cameraParams = calibrationSession.CameraParameters;
 
+simulation = true;
+
 % Initialize the pibot connection
-pb = PiBot('192.168.50.1');
+
+if simulation
+    pb = piBotSim("floor_course.jpg");
+    % Start by placing your robot at the start of the line
+    x0 = 1;
+    y0 = 1;
+    theta0 = 0;
+    pb.place([x0;y0], theta0);
+    pb.showLandmarks(true);
+else
+    pb = PiBot('192.168.50.1');
+end
 
 % Initialise your EKF class
 EKF = ekf_slam();
@@ -30,18 +43,21 @@ figure;
 robotPlot = plot(0, 0, 'ro', 'MarkerSize', 10, 'MarkerFaceColor', 'r');
 hold on;
 landmarkPlot = plot(0, 0, 'b*', 'MarkerSize', 8);
-xlim([0, 4]);
-ylim([0, 4]);
+xlim([-1, 5]);
+ylim([-1, 5]);
 grid on;
 title('Robot and Landmark Positions');
 xlabel('X (m)');
 ylabel('Y (m)');
 
-
+% Initialize visualization data struct
+vis_data = struct('time', {}, 'robot_pos', {}, 'robot_cov', {}, 'landmark_pos', {}, 'landmark_cov', {}, 'landmark_nums', {});
 
 % INITIAL STATE
 u = 0;
 q = 0;
+
+start_time = tic; % Start timer for the entire run
 
 while(true)
     dt = toc;
@@ -54,31 +70,44 @@ while(true)
     img = pb.getImage();
 
     % measure landmarks and update EKF
-    [marker_nums, landmark_centres, ~] = detectArucoPoses(img, marker_length, cameraParams, arucoDict);
+    if simulation
+        [landmark_centres, marker_nums] = pb.measureLandmarks();
+    else
+        [marker_nums, landmark_centres, ~] = detectArucoPoses(img, marker_length, cameraParams, arucoDict);
+    end
+
+    % Filter out markers with IDs >= 30 and those more than 2m away
+    valid_markers = (marker_nums < 30) & (vecnorm(landmark_centres) <= 2);
+    marker_nums = marker_nums(valid_markers);
+    landmark_centres = landmark_centres(:, valid_markers);
 
     if ~isempty(marker_nums)
-        % Prepare measurements (only x and y components in robot frame)
-        measurements = landmark_centres(:, 1:2);
-
-        % Filter out markers with IDs >= 30 (if necessary)
-        valid_indices = marker_nums < 50;
-        marker_nums = marker_nums(valid_indices);
-        measurements = measurements(valid_indices, :);
-
         % Call EKF input_measurements
-        if ~isempty(marker_nums)
-            EKF.update(measurements, marker_nums);
-        end
+        EKF.update(landmark_centres, marker_nums);
 
-        % Get estimates from EKF
-        [robot_est, ~] = EKF.output_robot();
-        [landmarks_est, cov] = EKF.output_landmarks();
-
-        % Update the plot
-        set(robotPlot, 'XData', robot_est(1), 'YData', robot_est(2));
-        % set(landmarkPlot, 'XData', landmarks_est(:,1), 'YData', landmarks_est(:,2));
-        drawnow;
     end
+
+    % Get estimates from EKF
+    [robot_est, robot_cov] = EKF.output_robot();
+    [landmarks_est, landmarks_cov] = EKF.output_landmarks();
+    
+    % Get the idx2num array from EKF
+    idx2num = EKF.idx2num;
+
+    % Update the plot
+    set(robotPlot, 'XData', robot_est(1), 'YData', robot_est(2));
+    set(landmarkPlot, 'XData', landmarks_est(1,:), 'YData', landmarks_est(2,:));
+    drawnow;
+
+    % Store data for visualization
+    current_time = toc(start_time);
+    vis_data(end+1).time = current_time;
+    vis_data(end).robot_pos = robot_est(1:3);
+    vis_data(end).robot_cov = robot_cov(1:2, 1:2);
+    vis_data(end).landmark_pos = landmarks_est;
+    vis_data(end).landmark_cov = landmarks_cov;
+    vis_data(end).landmark_nums = idx2num;  % Store all landmark numbers using idx2num
+
     % Binarize the image with a threshold
     gray_img = rgb2gray(img);
     bin_img = ~imbinarize(gray_img, 0.4);
@@ -101,6 +130,7 @@ while(true)
     if belowThresholdCount >= consecutiveThreshold
         break;
     end
+    
     % line follow module
     [u, q, wl, wr] = followLineIteration(height, width, bottom_third_bin_img);
 
@@ -111,4 +141,8 @@ end
 % END LINE FOLLOW
 pb.stop();
 
+% Save visualization data to a file
+save('visualization_data.mat', 'vis_data');
 
+% plot the trajectory
+plot_trajectory(vis_data);

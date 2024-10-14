@@ -6,7 +6,7 @@
 		},
 		{
 			"name": "arucoDetector",
-			"path": "../lab2robotcontrol/arucoDetector"
+			"path": "."
 		}
 	],
 	"settings": {}
