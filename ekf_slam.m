@@ -2,7 +2,8 @@ classdef ekf_slam < handle
     %EKF_SLAM The EKF algorithm for SLAM
 
     properties
-        x = zeros(3,1); % The estimated state vector
+        % x = zeros(3,1); % The estimated state vector
+        x = [1;1;0];
         P = zeros(3,3); % The estimated state covariance
 
         % The covariance values provided here are NOT correct!

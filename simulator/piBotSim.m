@@ -19,11 +19,11 @@ classdef piBotSim < handle
     end
     
     % States to be set upon instantiation of the simulator.
-    properties(GetAccess = private, SetAccess = immutable)
+    properties(GetAccess = public, SetAccess = immutable)
         floorImage = imread("floor.jpg"); % The image used to make the floor.
         worldLandmarkNumber = 20; % The number of landmarks in the world
         worldLandmarkPositions; % The positions of the landmarks (2xn) (m)
-    end
+    end 
     
     % Static parameters of the world and robot
     properties(Constant)

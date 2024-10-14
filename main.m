@@ -43,8 +43,8 @@ figure;
 robotPlot = plot(0, 0, 'ro', 'MarkerSize', 10, 'MarkerFaceColor', 'r');
 hold on;
 landmarkPlot = plot(0, 0, 'b*', 'MarkerSize', 8);
-xlim([-1, 5]);
-ylim([-1, 5]);
+xlim([0, 5]);
+ylim([0, 5]);
 grid on;
 title('Robot and Landmark Positions');
 xlabel('X (m)');
@@ -127,7 +127,7 @@ while(true)
     end
 
     % Check if the robot has reached the end of the line
-    if current_time > 120
+    if current_time > 20
         break;
     elseif belowThresholdCount <= consecutiveThreshold
         [u, q, wl, wr] = followLineIteration(height, width, bottom_third_bin_img);
@@ -155,6 +155,11 @@ pb.stop();
 
 % Save visualization data to a file
 save('visualization_data.mat', 'vis_data');
+
+% evaluate landmark estimates
+rms_error = evaluate_landmarks(vis_data, simulation, pb);
+disp("Landmark position RMS error: ");
+disp(rms_error);
 
 % plot the trajectory
 plot_trajectory(vis_data);
