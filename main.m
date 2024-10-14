@@ -127,12 +127,24 @@ while(true)
     end
 
     % Check if the robot has reached the end of the line
-    if belowThresholdCount >= consecutiveThreshold
+    if current_time > 120
         break;
+    elseif belowThresholdCount <= consecutiveThreshold
+        [u, q, wl, wr] = followLineIteration(height, width, bottom_third_bin_img);
+    else
+        u = 0;
+        q = 0.8;
+        % Calculate wheel velocities using inverse kinematics
+        [wl, wr] = inverse_kinematics(u, q);
+
+        % Helper function to round wheel velocities to the nearest lower multiple of 5
+        round_to_lower_5 = @(value) 5 * floor(value / 5);
+        wl = round_to_lower_5(wl);
+        wr = round_to_lower_5(wr);
+
+        % Calculate the actual velocities after rounding
+        [u, q] = forward_kinematics(wl, wr);
     end
-    
-    % line follow module
-    [u, q, wl, wr] = followLineIteration(height, width, bottom_third_bin_img);
 
     pb.setVelocity(wl, wr);
     
