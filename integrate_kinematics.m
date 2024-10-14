@@ -20,5 +20,6 @@ function new_state = integrate_kinematics(state, dt, lin_velocity, ang_velocity)
     end
     
     theta = theta + dt * q;
+    
     new_state = [x; y; theta];
 end

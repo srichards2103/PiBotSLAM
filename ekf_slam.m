@@ -7,7 +7,7 @@ classdef ekf_slam < handle
 
         % The covariance values provided here are NOT correct!
         sigxy = 0.01; % The covariance of linear velocity
-        sigth = 0.01; % The covariance of angular velocity
+        sigth = 0.1; % The covariance of angular velocity
         siglm = 0.1; % The covariance of landmark measurements
 
         % R = [siglm, 0; 0, siglm]; % Covariance matrix for landmark measurements
@@ -23,7 +23,7 @@ classdef ekf_slam < handle
             % the time step, and the covariance of the update step.
             obj.x(1:3) = f(obj.x, dt, lin_velocity, ang_velocity);
 
-            A = jac_f(obj.x, dt, lin_velocity);
+            A = jac_f(obj.x, dt, lin_velocity, ang_velocity);
             % Add the NxN identity matrix to the diagonal of A (where N is the number of landmarks)
             
             A = [A, zeros(3, 2*obj.n); zeros(2*obj.n, 3), eye(2*obj.n)];
@@ -43,13 +43,10 @@ classdef ekf_slam < handle
             % matching up landmark ids with their indices in the state
             % vector and covariance matrix.
 
-            % transform measurements to ref frame
-            world_measurements = obj.meas2y(measurements);
-
             % find the indices of the observed landmarks in the state vector
             idx_existing = ismember(nums, obj.idx2num);
             nums_existing = nums(idx_existing);
-            measurements_existing = world_measurements(:, idx_existing);
+            measurements_existing = measurements(:, idx_existing);
 
             % Find the corresponding indices in the state vector
             idx = zeros(size(nums_existing));
@@ -59,6 +56,8 @@ classdef ekf_slam < handle
             
             % augment state vector and covariance matrix with new landmarks 
             % before performing the update step
+            % transform measurements to ref frame
+            world_measurements = obj.meas2world(measurements);
             obj.add_new_landmarks(world_measurements, nums);
 
             % compute the Jacobian of the measurement function
@@ -115,16 +114,16 @@ classdef ekf_slam < handle
             cov = obj.P(4:end, 4:end);
         end
 
-        function y = meas2y(obj,measurements)
-            % meas2y: Transform landmark measurements from robot to world frame
+        function ref = meas2world(obj,measurements)
+            % meas2world: Transform landmark measurements from robot to world frame
             % Input: measurements (2xN matrix) in robot frame
-            % Output: y (2xN matrix) in world frame
-            y = zeros(size(measurements));
+            % Output: ref (2xN matrix) in world frame
+            ref = zeros(size(measurements));
             for i = 1:size(measurements,2)
                 theta = obj.x(3);
                 Rot = [cos(theta) -sin(theta); 
                      sin(theta)  cos(theta)];
-                y(:,i) = obj.x(1:2) + Rot * measurements(:,i);
+                ref(:,i) = obj.x(1:2) + Rot * measurements(:,i);
             end
         end
 
@@ -138,7 +137,7 @@ function x1 = f(x0, dt, u, q)
     x1 = integrate_kinematics(x0, dt, u, q);
 end
 
-function F = jac_f(x0, dt, u)
+function F = jac_f(x0, dt, u, ~)
 % Given the state x0 and input signal u, compute the Jacobian of f.
     F = eye(3);
     F(1,3) = - dt*sin(x0(3))*u;

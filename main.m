@@ -72,13 +72,12 @@ while(true)
     % measure landmarks and update EKF
     if simulation
         [landmark_centres, marker_nums] = pb.measureLandmarks();
-        
     else
         [marker_nums, landmark_centres, ~] = detectArucoPoses(img, marker_length, cameraParams, arucoDict);
     end
 
     % Filter out markers with IDs >= 30 and those more than 2m away
-    valid_markers = (marker_nums < 30) & (vecnorm(landmark_centres) <= 1);
+    valid_markers = (marker_nums < 30) & (vecnorm(landmark_centres) <= 2);
     marker_nums = marker_nums(valid_markers);
     landmark_centres = landmark_centres(:, valid_markers);
 
@@ -86,27 +85,28 @@ while(true)
         % Call EKF input_measurements
         EKF.update(landmark_centres, marker_nums);
 
-        % Get estimates from EKF
-        [robot_est, robot_cov] = EKF.output_robot();
-        [landmarks_est, landmarks_cov] = EKF.output_landmarks();
-        
-        % Get the idx2num array from EKF
-        idx2num = EKF.idx2num;
-
-        % Store data for visualization
-        current_time = toc(start_time);
-        vis_data(end+1).time = current_time;
-        vis_data(end).robot_pos = robot_est(1:3);
-        vis_data(end).robot_cov = robot_cov(1:2, 1:2);
-        vis_data(end).landmark_pos = landmarks_est;
-        vis_data(end).landmark_cov = landmarks_cov;
-        vis_data(end).landmark_nums = idx2num;  % Store all landmark numbers using idx2num
-
-        % Update the plot
-        set(robotPlot, 'XData', robot_est(1), 'YData', robot_est(2));
-        set(landmarkPlot, 'XData', landmarks_est(1,:), 'YData', landmarks_est(2,:));
-        drawnow;
     end
+
+    % Get estimates from EKF
+    [robot_est, robot_cov] = EKF.output_robot();
+    [landmarks_est, landmarks_cov] = EKF.output_landmarks();
+    
+    % Get the idx2num array from EKF
+    idx2num = EKF.idx2num;
+
+    % Update the plot
+    set(robotPlot, 'XData', robot_est(1), 'YData', robot_est(2));
+    set(landmarkPlot, 'XData', landmarks_est(1,:), 'YData', landmarks_est(2,:));
+    drawnow;
+
+    % Store data for visualization
+    current_time = toc(start_time);
+    vis_data(end+1).time = current_time;
+    vis_data(end).robot_pos = robot_est(1:3);
+    vis_data(end).robot_cov = robot_cov(1:2, 1:2);
+    vis_data(end).landmark_pos = landmarks_est;
+    vis_data(end).landmark_cov = landmarks_cov;
+    vis_data(end).landmark_nums = idx2num;  % Store all landmark numbers using idx2num
 
     % Binarize the image with a threshold
     gray_img = rgb2gray(img);
@@ -133,7 +133,6 @@ while(true)
     
     % line follow module
     [u, q, wl, wr] = followLineIteration(height, width, bottom_third_bin_img);
-    disp([wl,wr]);
 
     pb.setVelocity(wl, wr);
     
@@ -145,5 +144,5 @@ pb.stop();
 % Save visualization data to a file
 save('visualization_data.mat', 'vis_data');
 
-% Animate the trajectory
-animate_trajectory(vis_data);
+% plot the trajectory
+plot_trajectory(vis_data);
