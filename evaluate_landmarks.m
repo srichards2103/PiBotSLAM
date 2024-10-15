@@ -1,4 +1,4 @@
-function rms_error = evaluate_landmarks(vis_data, simulation, pb)
+function [rms_error, R, t] = evaluate_landmarks(vis_data, simulation, pb)
     % evaluate_landmarks - Calculate RMS error of estimated landmark positions
     %
     % Inputs:
