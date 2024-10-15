@@ -32,31 +32,66 @@ function rms_error = evaluate_landmarks(vis_data, simulation, pb)
 
     % Initialize variables
     num_landmarks = length(true_landmark_nums);
-    squared_errors = zeros(num_landmarks, 1);
-
+    
     % Get the last frame of vis_data
     last_frame = vis_data(end);
-
+    
+    % Prepare point sets for Kabsch algorithm
+    true_points = [];
+    est_points = [];
+    
     % Loop through each true landmark
     for i = 1:num_landmarks
         true_num = true_landmark_nums(i);
-        true_pos = true_landmarks(:, i)';  % Transpose to make it a row vector
+        true_pos = true_landmarks(:, i);
         
         % Find the corresponding estimated landmark
         est_idx = find(last_frame.landmark_nums == true_num, 1);
         
         if ~isempty(est_idx)
-            est_pos = last_frame.landmark_pos(:, est_idx)';  % Transpose to make it a row vector
+            est_pos = last_frame.landmark_pos(:, est_idx);
             
-            % Calculate squared error
-            squared_errors(i) = sum((true_pos - est_pos).^2);
-        else
-            % If landmark not found in estimates, set error to NaN
-            squared_errors(i) = NaN;
+            % Add points to the sets
+            true_points = [true_points, true_pos];
+            est_points = [est_points, est_pos];
         end
     end
+    
+    % Apply Kabsch algorithm
+    [R, t] = kabsch(est_points, true_points);
+    
+    % Transform estimated points
+    aligned_est_points = R * est_points + t;
+    
+    % Calculate RMSD
+    squared_deviations = sum((true_points - aligned_est_points).^2, 1);
+    rmsd = sqrt(mean(squared_deviations));
+    
+    % Set the output
+    rms_error = rmsd;
+end
 
-    % Calculate RMS error, ignoring NaN values
-    valid_errors = squared_errors(~isnan(squared_errors));
-    rms_error = sqrt(mean(valid_errors));
+% Kabsch algorithm implementation
+function [R, t] = kabsch(P, Q)
+    % Center the point sets
+    centroid_P = mean(P, 2);
+    centroid_Q = mean(Q, 2);
+    P_centered = P - centroid_P;
+    Q_centered = Q - centroid_Q;
+    
+    % Compute the covariance matrix
+    H = P_centered * Q_centered';
+    
+    % Compute the optimal rotation matrix
+    [U, ~, V] = svd(H);
+    R = V * U';
+    
+    % Ensure a right-handed coordinate system
+    if det(R) < 0
+        V(:, 3) = -V(:, 3);
+        R = V * U';
+    end
+    
+    % Compute the translation
+    t = centroid_Q - R * centroid_P;
 end
