@@ -13,9 +13,21 @@ function rms_error = evaluate_landmarks(vis_data, simulation, pb)
         true_landmarks = pb.worldLandmarkPositions;
         true_landmark_nums = 1:size(true_landmarks, 2);
     else
-        % Load true landmarks from a file
-        % load('true_landmarks.mat');
-        error('Non-simulation mode not implemented yet');
+        % Load true landmarks from a JSON file
+        fid = fopen('groundtruth_1016.json');
+        raw = fread(fid, inf);
+        str = char(raw');
+        fclose(fid);
+        json_data = jsondecode(str);
+        
+        % Extract landmark numbers and positions
+        field_names = fieldnames(json_data);
+        landmark_nums = cellfun(@(x) str2double(x(2:end)), field_names);
+        landmark_positions = cell2mat(struct2cell(json_data)');
+        
+        % Sort landmarks by their numbers
+        [true_landmark_nums, sort_idx] = sort(landmark_nums);
+        true_landmarks = landmark_positions(sort_idx, :)';
     end
 
     % Initialize variables
