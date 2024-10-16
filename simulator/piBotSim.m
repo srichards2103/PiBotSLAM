@@ -40,7 +40,7 @@ classdef piBotSim < handle
         robotCameraHeight = 0.1; % The height of the camera from the ground (m).
         robotCameraR = [0,-1,0;0,0,-1;1,0,0]'; % The orienation of the camera w.r.t. the robot.
         robotCameraRef = imref2d([200,400]); % Size of the camera output image.
-        worldARUCOSize = 0.08; % Size of ARUCO landmarks (m).
+        worldARUCOSize = 0.075; % Size of ARUCO landmarks (m).
         % worldARUCOSize = 0.3; % Size of ARUCO landmarks (m).
         worldARUCONoise = 0.002; % Noise on projection measurement of ARUCO landmarks.
         worldLandmarkMinDist = 0.2; % Minimum distance between generated landmarks.

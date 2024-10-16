@@ -7,9 +7,11 @@ classdef ekf_slam < handle
         P = zeros(3,3); % The estimated state covariance
 
         % The covariance values provided here are NOT correct!
-        sigxy = 0.01; % The covariance of linear velocity
-        sigth = 0.01; % The covariance of angular velocity
-        siglm = 0.01; % The covariance of landmark measurements
+        sigxy = 0.02; % The covariance of linear velocity
+        sigth = 0.15; % The covariance of angular velocity
+
+        siglmx = 0.02; % The covariance of LM x measurements
+        siglmy = 0.04; % The covariance of LM y measurements
 
         % R = [siglm, 0; 0, siglm]; % Covariance matrix for landmark measurements
 
@@ -66,7 +68,7 @@ classdef ekf_slam < handle
             
             % Calculate R_k based on measurement uncertainty
             m = length(idx);  % number of observed landmarks
-            R_k = kron(eye(m), [obj.siglm, 0; 0, obj.siglm]);  % 2m x 2m diagonal matrix
+            R_k = kron(eye(m), [obj.siglmx, 0; 0, obj.siglmy]);  % 2m x 2m diagonal matrix
 
             % % Display sizes of relevant matrices (for debugging)
             % disp(['Size of obj.P: ', num2str(size(obj.P))]);
@@ -92,7 +94,7 @@ classdef ekf_slam < handle
                     obj.x = [obj.x; y(:,i)];
                     
                     % Expand covariance matrix using blkdiag
-                    obj.P = blkdiag(obj.P, diag([obj.siglm, obj.siglm]));
+                    obj.P = blkdiag(obj.P, diag([obj.siglmx, obj.siglmy]));
                     
                     % Update landmark count and index mapping
                     obj.n = obj.n + 1;

@@ -9,7 +9,7 @@ function animate_trajectory(vis_data)
     hold on;
     robot_plot = plot(NaN, NaN, 'ro', 'MarkerSize', 10, 'MarkerFaceColor', 'none');
     landmark_plots = cell(1, 30);  % Assuming maximum of 30 landmarks
-    landmark_labels = cell(1, 30);  % New: Text objects for landmark numbers
+    landmark_labels = cell(1, 30);  % Text objects for landmark numbers
     
     % Set axis limits
     xlim([-1, 5]);
@@ -35,22 +35,24 @@ function animate_trajectory(vis_data)
         % Update landmark positions and covariances
         landmark_pos = vis_data(frame).landmark_pos;
         landmark_cov = vis_data(frame).landmark_cov;
-        landmark_nums = vis_data(frame).landmark_nums;  % New: Get landmark numbers
+        landmark_nums = vis_data(frame).landmark_nums;
         
         for i = 1:size(landmark_pos, 2)
             if isempty(landmark_plots{i})
-                landmark_plots{i} = plot(NaN, NaN, 'o', 'Color', cmap(i,:), 'MarkerSize', 8, 'MarkerFaceColor', 'none');
-                % New: Create text object for landmark number
+                landmark_plots{i} = plot(NaN, NaN, 'Color', cmap(i,:), 'LineWidth', 2);
                 landmark_labels{i} = text(NaN, NaN, '', 'Color', cmap(i,:), 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
             end
             
-            % Calculate landmark marker size based on covariance
+            % Extract landmark covariance
             landmark_cov_i = landmark_cov(2*i-1:2*i, 2*i-1:2*i);
-            landmark_size = 8 + 200 * sqrt(trace(landmark_cov_i));
             
-            set(landmark_plots{i}, 'XData', landmark_pos(1,i), 'YData', landmark_pos(2,i), 'MarkerSize', landmark_size);
+            % Calculate ellipse parameters
+            [ellipse_x, ellipse_y] = calculate_error_ellipse(landmark_pos(:,i), landmark_cov_i);
             
-            % New: Update text position and content
+            % Update ellipse plot
+            set(landmark_plots{i}, 'XData', ellipse_x, 'YData', ellipse_y);
+            
+            % Update text position and content
             set(landmark_labels{i}, 'Position', [landmark_pos(1,i), landmark_pos(2,i)], 'String', num2str(landmark_nums(i)));
         end
         
@@ -65,4 +67,57 @@ function animate_trajectory(vis_data)
             waitforbuttonpress;
         end
     end
+end
+
+function [x, y] = calculate_error_ellipse(mean, covariance)
+    % Calculate the eigenvectors and eigenvalues
+    [eigenvec, eigenval] = eig(covariance);
+    
+    % Get the index of the largest eigenvector
+    [largest_eigenvec_ind_c, r] = find(eigenval == max(max(eigenval)));
+    largest_eigenvec = eigenvec(:, largest_eigenvec_ind_c);
+    
+    % Get the largest eigenvalue
+    largest_eigenval = max(max(eigenval));
+    
+    % Get the smallest eigenvector and eigenvalue
+    if largest_eigenvec_ind_c == 1
+        smallest_eigenval = eigenval(2,2);
+        smallest_eigenvec = eigenvec(:,2);
+    else
+        smallest_eigenval = eigenval(1,1);
+        smallest_eigenvec = eigenvec(1,:);
+    end
+    
+    % Calculate the angle between the x-axis and the largest eigenvector
+    angle = atan2(largest_eigenvec(2), largest_eigenvec(1));
+    
+    % This angle is between -pi and pi.
+    % Let's shift it such that the angle is between 0 and 2pi
+    if(angle < 0)
+        angle = angle + 2*pi;
+    end
+    
+    % Get the 95% confidence interval error ellipse
+    chisquare_val = 5.991;
+    theta_grid = linspace(0, 2*pi);
+    phi = angle;
+    X0 = mean(1);
+    Y0 = mean(2);
+    a = sqrt(chisquare_val * largest_eigenval);
+    b = sqrt(chisquare_val * smallest_eigenval);
+    
+    % The ellipse in x and y coordinates
+    ellipse_x_r = a * cos(theta_grid);
+    ellipse_y_r = b * sin(theta_grid);
+    
+    % Define a rotation matrix
+    R = [cos(phi) sin(phi); -sin(phi) cos(phi)];
+    
+    % Rotate the ellipse to some angle phi
+    r_ellipse = [ellipse_x_r; ellipse_y_r]' * R;
+    
+    % Draw the error ellipse
+    x = r_ellipse(:,1) + X0;
+    y = r_ellipse(:,2) + Y0;
 end

@@ -11,11 +11,12 @@ addpath("arucoDetector/dictionary")
 % Load parameters
 load('arucoDetector/dictionary/arucoDict.mat');
 load("calibrationSession.mat")
-marker_length = 0.070;
+marker_length = 0.075;
 
 cameraParams = calibrationSession.CameraParameters;
 
 simulation = true;
+end_time = 30;
 
 % Initialize the pibot connection
 
@@ -127,9 +128,29 @@ while(true)
     end
 
     % Check if the robot has reached the end of the line
-    if current_time > 20
+    if current_time < 5
+        u = 0;
+        q = 0;
+        % Calculate wheel velocities using inverse kinematics
+        [wl, wr] = inverse_kinematics(u, q);
+    elseif current_time < 7
+        u = 0;
+        q = 0.4;
+        % Calculate wheel velocities using inverse kinematics
+        [wl, wr] = inverse_kinematics(u, q);
+    elseif current_time < 11
+        u = 0;
+        q = -0.4;
+        % Calculate wheel velocities using inverse kinematics
+        [wl, wr] = inverse_kinematics(u, q);
+   elseif current_time < 13
+        u = 0;
+        q = 0.4;
+        % Calculate wheel velocities using inverse kinematics
+        [wl, wr] = inverse_kinematics(u, q);
+    elseif current_time > end_time
         break;
-    elseif belowThresholdCount <= consecutiveThreshold
+    elseif belowThresholdCount <= consecutiveThreshold & (current_time > 10)
         [u, q, wl, wr] = followLineIteration(height, width, bottom_third_bin_img);
     else
         u = 0;
