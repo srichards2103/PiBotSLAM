@@ -27,7 +27,7 @@ function rms_error = evaluate_landmarks(vis_data, simulation, pb)
         
         % Sort landmarks by their numbers
         [true_landmark_nums, sort_idx] = sort(landmark_nums);
-        true_landmarks = landmark_positions(sort_idx, :)';
+        true_landmarks = landmark_positions(:, sort_idx);
     end
 
     % Initialize variables

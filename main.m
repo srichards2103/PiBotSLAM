@@ -15,7 +15,7 @@ marker_length = 0.070;
 
 cameraParams = calibrationSession.CameraParameters;
 
-simulation = true;
+simulation = false;
 
 % Initialize the pibot connection
 
@@ -43,12 +43,23 @@ figure;
 robotPlot = plot(0, 0, 'ro', 'MarkerSize', 10, 'MarkerFaceColor', 'r');
 hold on;
 landmarkPlot = plot(0, 0, 'b*', 'MarkerSize', 8);
-xlim([0, 5]);
-ylim([0, 5]);
+
+% Load and plot track_data
+load('track_data.mat');
+trackPlot = plot(x_path, y_path, 'k-', 'LineWidth', 2);
+
+% Initialize robot path plot
+robotPathPlot = plot(0, 0, 'g-', 'LineWidth', 1.5);
+
+axis equal;
+xlim([min(x_path)-2, max(x_path)+2]);
+ylim([min(y_path)-2, max(y_path)+2]);
 grid on;
-title('Robot and Landmark Positions');
+title('Robot Path, Landmark Positions, and Track');
 xlabel('X (m)');
 ylabel('Y (m)');
+legend([robotPlot, landmarkPlot, trackPlot, robotPathPlot], ...
+       {'Robot', 'Landmarks', 'Track', 'Robot Path'}, 'Location', 'best');
 
 % Initialize visualization data struct
 vis_data = struct('time', {}, 'robot_pos', {}, 'robot_cov', {}, 'landmark_pos', {}, 'landmark_cov', {}, 'landmark_nums', {});
@@ -76,12 +87,17 @@ while(true)
         [marker_nums, landmark_centres, ~] = detectArucoPoses(img, marker_length, cameraParams, arucoDict);
     end
 
-    % Filter out markers with IDs >= 30 and those more than 2m away
-    valid_markers = (marker_nums < 30) & (vecnorm(landmark_centres) <= 2);
-    marker_nums = marker_nums(valid_markers);
-    landmark_centres = landmark_centres(:, valid_markers);
-
     if ~isempty(marker_nums)
+        % Filter out markers with IDs >= 30 and those more than 2m away
+        valid_markers = (marker_nums < 30) & (vecnorm(landmark_centres(1:2)) <= 2);
+        marker_nums = marker_nums(valid_markers);
+        
+        if simulation
+            landmark_centres = landmark_centres(:, valid_markers);
+        else
+            landmark_centres = landmark_centres(valid_markers, 1:2)';
+        end
+
         % Call EKF input_measurements
         EKF.update(landmark_centres, marker_nums);
 
@@ -97,6 +113,12 @@ while(true)
     % Update the plot
     set(robotPlot, 'XData', robot_est(1), 'YData', robot_est(2));
     set(landmarkPlot, 'XData', landmarks_est(1,:), 'YData', landmarks_est(2,:));
+    
+    % Update robot path plot
+    robot_path_x = cellfun(@(x) x(1), {vis_data.robot_pos});
+    robot_path_y = cellfun(@(x) x(2), {vis_data.robot_pos});
+    set(robotPathPlot, 'XData', robot_path_x, 'YData', robot_path_y);
+    
     drawnow;
 
     % Store data for visualization
@@ -127,7 +149,7 @@ while(true)
     end
 
     % Check if the robot has reached the end of the line
-    if current_time > 20
+    if current_time > 240
         break;
     elseif belowThresholdCount <= consecutiveThreshold
         [u, q, wl, wr] = followLineIteration(height, width, bottom_third_bin_img);
