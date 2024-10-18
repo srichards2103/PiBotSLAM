@@ -7,10 +7,10 @@ classdef ekf_slam < handle
 
         % The covariance values provided here are NOT correct!
         sigxy = 0.02; % The covariance of linear velocity
-        sigth = 0.07; % The covariance of angular velocity
+        sigth = 0.06; % The covariance of angular velocity
 
-        siglmx = 0.03; % The covariance of LM x measurements
-        siglmy = 0.01; % The covariance of LM y measurements
+        siglmx = 0.04; % The covariance of LM x measurements
+        siglmy = 0.015; % The covariance of LM y measurements
 
         % R = [siglm, 0; 0, siglm]; % Covariance matrix for landmark measurements
 

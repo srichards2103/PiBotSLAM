@@ -27,7 +27,7 @@ classdef piBotSim < handle
     
     % Static parameters of the world and robot
     properties(Constant)
-        simTimeStep = 0.1; % The duration of each step of the simulator (s).
+        simTimeStep = 0.2; % The duration of each step of the simulator (s).
         robotWheelVelScale = 5.43e-3; % The scaling applied to wheel velocities (tk/s).
         robotWheelVelNoise = 2.0/50; % Variance of the Gaussian noise added to the wheel velocities.
         robotMeasureNoisePosition = 0.005; % Variance of the Gaussian noise added to position measurements.
@@ -254,7 +254,7 @@ classdef piBotSim < handle
         
         function img = getImage(self)
             % Get an image from the robot camera
-            
+
             % Compute the warp map.
             R = self.rotz(self.robotAngle)*self.robotCameraR;
             x = [self.robotPosition; self.robotCameraHeight];

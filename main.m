@@ -16,12 +16,28 @@ marker_length = 0.075;
 cameraParams = calibrationSession.CameraParameters;
 
 simulation = true;
-end_time = 240;
+end_time = 120;
 
 % Initialize the pibot connection
 
 if simulation
-    pb = piBotSim("floor_course.jpg");
+    % Load true landmarks from a JSON file
+    fid = fopen('groundtruth_1016.json');
+    raw = fread(fid, inf);
+    str = char(raw');
+    fclose(fid);
+    json_data = jsondecode(str);
+    
+    % Extract landmark numbers and positions
+    field_names = fieldnames(json_data);
+    landmark_nums = cellfun(@(x) str2double(x(2:end)), field_names);
+    landmark_positions = cell2mat(struct2cell(json_data)');
+    
+    % Sort landmarks by their numbers
+    [true_landmark_nums, sort_idx] = sort(landmark_nums);
+    true_landmarks = landmark_positions(:, sort_idx);
+
+    pb = piBotSim("floor_course.jpg", true_landmarks+[1;1]);
     % Start by placing your robot at the start of the line
     pb.place([1;1], 0);
     pb.showLandmarks(true);
@@ -33,11 +49,11 @@ end
 EKF = ekf_slam();
 
 blackPixelThreshold = 90;        % Minimum number of black pixels to consider the line as present
-consecutiveThreshold = 5;        % Number of consecutive frames below the threshold to confirm end of line
+consecutiveThreshold = 2;        % Number of consecutive frames below the threshold to confirm end of line
 belowThresholdCount = 0;         % Counter for consecutive frames below the threshold
 tic;
 
-figure;
+fig = figure;
 % robotPlot = plot(0, 0, 'ro', 'MarkerSize', 10, 'MarkerFaceColor', 'r');
 % hold on;
 % landmarkPlot = plot(0, 0, 'b*', 'MarkerSize', 8);
@@ -81,10 +97,14 @@ while(true)
     EKF.predict(dt, u, q);
 
     % Get the current camera frame
-    try 
+    try
         img = pb.getImage();
-    catch 
-        disp("What is going on")
+    catch e
+        disp("Error in image capture:");
+        disp(e.message);
+        disp(e.stack(1));
+        imshow(img)
+        break;  % Exit the loop if image capture consistently fails
     end
 
     % measure landmarks and update EKF
@@ -113,7 +133,10 @@ while(true)
     % Get estimates from EKF
     [robot_pos, robot_cov] = EKF.output_robot();
     [landmarks_pos, landmarks_cov] = EKF.output_landmarks();
-
+    
+    % Use the existing figure
+    figure(fig);
+    
     % Robot position plot
     [robot_ellipse_x,robot_ellipse_y] = error_ellipse(robot_pos,robot_cov);
     set(robotPlot, 'XData', robot_ellipse_x, 'YData', robot_ellipse_y);
@@ -125,7 +148,7 @@ while(true)
     set(robotPathPlot, 'XData', robot_path_x, 'YData', robot_path_y);
 
     for i = 1:size(landmarks_pos, 2)
-        if isempty(landmarkPlots{i})
+        if isempty(landmarkPlots{i}) || ~isvalid(landmarkPlots{i})
             landmarkPlots{i} = plot(NaN, NaN, 'Color', lm_cmap(i,:), 'LineWidth', 2);
         end
             
@@ -138,7 +161,7 @@ while(true)
         % Update ellipse plot
         set(landmarkPlots{i}, 'XData', ellipse_x, 'YData', ellipse_y);
     end
-    
+
     drawnow;
 
     % Get the idx2num array from EKF
