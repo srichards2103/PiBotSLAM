@@ -15,8 +15,8 @@ marker_length = 0.075;
 
 cameraParams = calibrationSession.CameraParameters;
 
-simulation = true;
-end_time = 120;
+simulation = false;
+end_time = 240;
 
 % Initialize the pibot connection
 
@@ -83,6 +83,8 @@ ylabel('Y (m)');
 % Initialize visualization data struct
 vis_data = struct('time', {}, 'robot_pos', {}, 'robot_cov', {}, 'landmark_pos', {}, 'landmark_cov', {}, 'landmark_nums', {});
 
+test_dataset = struct('image', {}, 'dt', {});
+
 % INITIAL STATE
 u = 0;
 q = 0;
@@ -106,6 +108,9 @@ while(true)
         imshow(img)
         break;  % Exit the loop if image capture consistently fails
     end
+    test_dataset(end+1).dt = dt;
+    test_dataset(end).image = img;
+
 
     % measure landmarks and update EKF
     if simulation
@@ -222,7 +227,11 @@ while(true)
         [u, q, wl, wr] = followLineIteration(height, width, bottom_third_bin_img);
     else
         u = 0;
-        q = 0.8;
+        q = 1;
+
+        % turn 180 degrees
+        turn_time = pi/q;
+        
         % Calculate wheel velocities using inverse kinematics
         [wl, wr] = inverse_kinematics(u, q);
 
@@ -233,6 +242,10 @@ while(true)
 
         % Calculate the actual velocities after rounding
         [u, q] = forward_kinematics(wl, wr);
+        pb.setVelocity(wl, wr);
+        pause(turn_time);
+        wl = 0;
+        wr = 0;
     end
 
     pb.setVelocity(wl, wr);
@@ -244,6 +257,8 @@ pb.stop();
 
 % Save visualization data to a file
 save('visualization_data.mat', 'vis_data');
+
+save('test_dataset.mat', 'test_dataset');
 
 % evaluate landmark estimates
 rms_error = evaluate_landmarks(vis_data, simulation, pb);
