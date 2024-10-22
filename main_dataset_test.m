@@ -62,7 +62,7 @@ ylabel('Y (m)');
 vis_data = struct('time', {}, 'robot_pos', {}, 'robot_cov', {}, 'landmark_pos', {}, 'landmark_cov', {}, 'landmark_nums', {});
 
 % Load the test dataset
-load('test_dataset.mat');  % Assumes test_dataset is a struct with fields 'dt' and 'image'
+load('test_dataset_1.mat');  % Assumes test_dataset is a struct with fields 'dt' and 'image'
 
 % INITIAL STATE
 u = 0;  % Initialize control inputs (modify as needed)
@@ -89,7 +89,6 @@ for i = 1:num_entries
     % test_dataset(end).image = img;
     
     % Measure landmarks and update EKF
-
     
     [marker_nums, landmark_centres, ~] = detectArucoPoses(img, marker_length, cameraParams, arucoDict);
     
@@ -191,14 +190,7 @@ for i = 1:num_entries
 
         % Calculate the actual velocities after rounding
         [u, q] = forward_kinematics(wl, wr);
-        
-        % Since we're not controlling a robot, you might want to simulate this action
-        % For example, update robot_pos based on turn_time, u, q
-        % This part depends on your specific requirements
     end
-    
-    % Since we're not sending commands to a robot, you can optionally log u and q
-    % or use them to simulate robot movement in your visualization
 end
 
 % END LINE FOLLOW
@@ -212,9 +204,10 @@ save('visualization_data.mat', 'vis_data');
 % save('test_dataset_processed.mat', 'test_dataset');  % Optional
 
 % Evaluate landmark estimates
-rms_error = evaluate_landmarks(vis_data, false, []);  % Adjust the parameters as needed
+rms_error = evaluate_landmarks(vis_data, false);  % Adjust the parameters as needed
 disp("Landmark position RMS error: ");
 disp(rms_error);
 
 % Plot the trajectory
 plot_trajectory(vis_data);
+

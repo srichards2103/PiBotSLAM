@@ -5,12 +5,30 @@ classdef ekf_slam < handle
         x = zeros(3,1); % The estimated state vector
         P = zeros(3,3); % The estimated state covariance
 
-        % The covariance values provided here are NOT correct!
-        sigxy = 0.02; % The covariance of linear velocity
-        sigth = 0.06; % The covariance of angular velocity
+        % % The covariance values provided here are NOT correct!
+        % sigxy = 0.02; % The covariance of linear velocity
+        % sigth = 0.06; % The covariance of angular velocity
 
-        siglmx = 0.04; % The covariance of LM x measurements
-        siglmy = 0.015; % The covariance of LM y measurements
+        % siglmx = 0.04; % The covariance of LM x measurements
+        % siglmy = 0.015; % The covariance of LM y measurements
+        
+        % COVARIANCES FROM BAYESIAN OPTIMIZATION
+        % sigxy = 0.00023
+        % sigth = 0.07862
+        % siglmx = 0.03718;
+        % siglmy = 0.00159;
+
+        % COVARIANCES FROM GA
+        % sigxy = 0.00262
+        % sigth = 0.01192
+        % siglmx = 0.06985;
+        % siglmy = 0.01298;
+
+        % massive covariance
+        sigxy = 0.02;
+        sigth = 0.06;
+        siglmx = 0.04;
+        siglmy = 0.015;
 
         % R = [siglm, 0; 0, siglm]; % Covariance matrix for landmark measurements
 

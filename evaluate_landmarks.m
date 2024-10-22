@@ -1,4 +1,4 @@
-function rms_error = evaluate_landmarks(vis_data, simulation, pb)
+function rms_error = evaluate_landmarks(vis_data, simulation)
     % evaluate_landmarks - Calculate RMS error of estimated landmark positions
     %
     % Inputs:
@@ -14,7 +14,7 @@ function rms_error = evaluate_landmarks(vis_data, simulation, pb)
         true_landmark_nums = 1:size(true_landmarks, 2);
     else
         % Load true landmarks from a JSON file
-        fid = fopen('groundtruth_1016.json');
+        fid = fopen('groundtruth_1810.json');
         raw = fread(fid, inf);
         str = char(raw');
         fclose(fid);

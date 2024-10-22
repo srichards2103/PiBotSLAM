@@ -16,7 +16,9 @@ marker_length = 0.075;
 cameraParams = calibrationSession.CameraParameters;
 
 simulation = false;
-end_time = 240;
+end_time = 120;
+
+save_data = true;
 
 % Initialize the pibot connection
 
@@ -81,9 +83,11 @@ ylabel('Y (m)');
 %        {'Robot', 'Track', 'Robot Path'}, 'Location', 'best');
 
 % Initialize visualization data struct
-vis_data = struct('time', {}, 'robot_pos', {}, 'robot_cov', {}, 'landmark_pos', {}, 'landmark_cov', {}, 'landmark_nums', {});
+vis_data = struct('time', {}, 'robot_pos', {}, 'robot_cov', {}, 'landmark_pos', {}, 'landmark_cov', {}, 'landmark_nums', {}, 'landmarks_seen', {});
 
-test_dataset = struct('image', {}, 'dt', {});
+if save_data 
+    test_dataset = struct('image', {}, 'dt', {});
+end
 
 % INITIAL STATE
 u = 0;
@@ -108,9 +112,10 @@ while(true)
         imshow(img)
         break;  % Exit the loop if image capture consistently fails
     end
-    test_dataset(end+1).dt = dt;
-    test_dataset(end).image = img;
-
+    if save_data            
+        test_dataset(end+1).dt = dt;
+        test_dataset(end).image = img;
+    end
 
     % measure landmarks and update EKF
     if simulation
@@ -180,6 +185,7 @@ while(true)
     vis_data(end).landmark_pos = landmarks_pos;
     vis_data(end).landmark_cov = landmarks_cov;
     vis_data(end).landmark_nums = idx2num;  % Store all landmark numbers using idx2num
+    vis_data(end).landmarks_seen = marker_nums;
 
     % Binarize the image with a threshold
     gray_img = rgb2gray(img);
@@ -258,10 +264,12 @@ pb.stop();
 % Save visualization data to a file
 save('visualization_data.mat', 'vis_data');
 
-save('test_dataset.mat', 'test_dataset');
+if save_data
+    save('test_dataset.mat', 'test_dataset');
+end
 
 % evaluate landmark estimates
-rms_error = evaluate_landmarks(vis_data, simulation, pb);
+rms_error = evaluate_landmarks(vis_data, simulation);
 disp("Landmark position RMS error: ");
 disp(rms_error);
 
