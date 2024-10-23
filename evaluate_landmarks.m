@@ -1,10 +1,11 @@
-function rms_error = evaluate_landmarks(vis_data, simulation)
+function [rms_error, R, t] = evaluate_landmarks(vis_data, simulation, pb)
     % evaluate_landmarks - Calculate RMS error of estimated landmark positions
     %
     % Inputs:
     %   vis_data - struct containing estimated landmark positions and numbers
     %   simulation - boolean flag indicating whether this is a simulation
-    %   pb - PiBot or PiBotSim object (only needed for simulation)
+    %   pb - (optional) PiBot or PiBotSim object (only needed for simulation)
+
     %
     % Output:
     %   rms_error - Root Mean Square error of landmark position estimates
@@ -14,7 +15,7 @@ function rms_error = evaluate_landmarks(vis_data, simulation)
         true_landmark_nums = 1:size(true_landmarks, 2);
     else
         % Load true landmarks from a JSON file
-        fid = fopen('groundtruth_1810.json');
+        fid = fopen('groundtruth_demo.json');
         raw = fread(fid, inf);
         str = char(raw');
         fclose(fid);
@@ -39,7 +40,8 @@ function rms_error = evaluate_landmarks(vis_data, simulation)
     % Prepare point sets for Kabsch algorithm
     true_points = [];
     est_points = [];
-    
+
+
     % Loop through each true landmark
     for i = 1:num_landmarks
         true_num = true_landmark_nums(i);
@@ -56,7 +58,7 @@ function rms_error = evaluate_landmarks(vis_data, simulation)
             est_points = [est_points, est_pos];
         end
     end
-    
+
     % Apply Kabsch algorithm
     [R, t] = kabsch(est_points, true_points);
     
@@ -66,7 +68,16 @@ function rms_error = evaluate_landmarks(vis_data, simulation)
     % Calculate RMSD
     squared_deviations = sum((true_points - aligned_est_points).^2, 1);
     rmsd = sqrt(mean(squared_deviations));
+
+    % Calculate RMSD of non aligned points
+    squared_deviations = sum((true_points - est_points).^2, 1);
+    rmsd_non_aligned = sqrt(mean(squared_deviations));
+
+    disp("RMSD of non aligned points: ");
+    disp(rmsd_non_aligned);
     
+    % Save the landmarks to a JSON file
+    save_landmarks_to_json(last_frame.landmark_nums, last_frame.landmark_pos, 'estimated_landmarks.json');
     % Set the output
     rms_error = rmsd;
 end
@@ -94,4 +105,40 @@ function [R, t] = kabsch(P, Q)
     
     % Compute the translation
     t = centroid_Q - R * centroid_P;
+end
+% Add this new function at the end of the file
+function save_landmarks_to_json(landmark_nums, landmark_pos, filename)
+    % Create a container for the landmark data
+    landmark_data = containers.Map('KeyType', 'char', 'ValueType', 'any');
+    
+    % Populate the container with landmark numbers and positions
+    for i = 1:length(landmark_nums)
+        key = num2str(landmark_nums(i));
+        landmark_data(key) = landmark_pos(:, i)';
+    end
+    
+    % Sort the keys (landmark numbers)
+    sorted_keys = sort(cellfun(@str2num, landmark_data.keys));
+    
+    % Create the JSON string manually
+    json_str = '{';
+    for i = 1:length(sorted_keys)
+        key = num2str(sorted_keys(i));
+        value = landmark_data(key);
+        json_str = [json_str sprintf('"%s": [%.3f, %.3f]', key, value(1), value(2))];
+        if i < length(sorted_keys)
+            json_str = [json_str, ', '];
+        end
+    end
+    json_str = [json_str '}'];
+    
+    % Write the JSON string to a file
+    fid = fopen(filename, 'w');
+    if fid == -1
+        error('Cannot create JSON file');
+    end
+    fwrite(fid, json_str, 'char');
+    fclose(fid);
+    
+    fprintf('Landmarks saved to %s\n', filename);
 end
