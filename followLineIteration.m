@@ -13,13 +13,21 @@ function [u, q, wl, wr] = followLineIteration(height, width, bottom_third_bin_im
     centerOfMass = (centerOfMass - [width/2, height/6]) ./ [width/2, height/6];
 
     % Proportional control for angular velocity based on the center of mass
+    % angular_velocity = -0.8  * centerOfMass(1);
+
+    % % Determine linear velocity based on the position of the line
+    % if abs(centerOfMass(1)) > 0.2
+    %     linear_velocity = 0.15;
+    % else
+    %     linear_velocity = 0.25;
+    % end
     angular_velocity = -0.8  * centerOfMass(1);
 
     % Determine linear velocity based on the position of the line
     if abs(centerOfMass(1)) > 0.2
-        linear_velocity = 0.15;
+        linear_velocity = 0.125;
     else
-        linear_velocity = 0.25;
+        linear_velocity = 0.175;
     end
 
     % Calculate wheel velocities using inverse kinematics

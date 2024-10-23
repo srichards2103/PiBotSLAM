@@ -1,4 +1,3 @@
-% Adjusted MATLAB Code to Process test_dataset.mat
 
 % Always begin by using addpath
 addpath("simulator")
@@ -16,17 +15,6 @@ marker_length = 0.075;
 
 cameraParams = calibrationSession.CameraParameters;
 
-% Simulation flag is no longer needed since we're processing a dataset
-% simulation = false;
-end_time = 120;  % Adjust as needed or remove if not applicable
-
-% Initialize the PiBot connection is no longer needed
-% if simulation
-%     % Simulation-specific code...
-% else
-%     pb = PiBot('192.168.50.1');
-% end
-
 % Initialize EKF class
 EKF = ekf_slam();
 
@@ -38,10 +26,14 @@ belowThresholdCount = 0;         % Counter for consecutive frames below the thre
 % Initialize plotting
 fig = figure;
 
+% Robot plot (Error Ellipse)
 robotPlot = plot(0, 0, 'g-', 'LineWidth', 2);
 hold on;
-landmarkPlots = cell(1, 30);  % Assuming maximum of 30 landmarks
-lm_cmap = colormap(hsv(30));
+
+% Initialize cell arrays for landmarks' uncertainty ellipses and text labels
+landmarkPlots = cell(1, 30);      % Assuming maximum of 30 landmarks
+landmarkTexts = cell(1, 30);      % Cell array to store text handles for marker IDs
+lm_cmap = colormap(hsv(30));       % Color map for landmarks
 
 % Load and plot track_data
 load('track_data.mat');
@@ -50,9 +42,10 @@ trackPlot = plot(x_path, y_path, 'k-', 'LineWidth', 2);
 % Initialize robot path plot
 robotPathPlot = plot(0, 0, 'g-', 'LineWidth', 1.5);
 
+% Set plot properties
 axis equal;
-xlim([min(x_path)-2, max(x_path)+2]);
-ylim([min(y_path)-2, max(y_path)+2]);
+xlim([min(x_path)-1, max(x_path)+1]);
+ylim([min(y_path)-1, max(y_path)+1]);
 grid on;
 title('Robot Path, Landmark Positions, and Track');
 xlabel('X (m)');
@@ -61,8 +54,11 @@ ylabel('Y (m)');
 % Initialize visualization data struct
 vis_data = struct('time', {}, 'robot_pos', {}, 'robot_cov', {}, 'landmark_pos', {}, 'landmark_cov', {}, 'landmark_nums', {});
 
+% Initialize cell array for text labels
+landmarkTexts = cell(1, 30);  % Assuming a maximum of 30 landmarks
+
 % Load the test dataset
-load('test_dataset_1.mat');  % Assumes test_dataset is a struct with fields 'dt' and 'image'
+load('datasets/test_dataset_2310_slow.mat');  % Assumes test_dataset is a struct with fields 'dt' and 'image'
 
 % INITIAL STATE
 u = 0;  % Initialize control inputs (modify as needed)
@@ -76,26 +72,20 @@ start_time = tic; % Start timer for the entire run
 
 % Iterate through each entry in the test dataset
 num_entries = length(test_dataset);
-for i = 1:num_entries
+for idx = 1:num_entries  % 
     % Get the current data entry
-    dt = test_dataset(i).dt;
-    img = test_dataset(i).image;
+    dt = test_dataset(idx).dt;
+    img = test_dataset(idx).image;
     
     % EKF PREDICT
     EKF.predict(dt, u, q);
     
-    % Store the current dt and img if needed (optional)
-    % test_dataset(end+1).dt = dt;  % Not needed since we're loading the dataset
-    % test_dataset(end).image = img;
-    
     % Measure landmarks and update EKF
-    
     [marker_nums, landmark_centres, ~] = detectArucoPoses(img, marker_length, cameraParams, arucoDict);
     
     if ~isempty(marker_nums)
         % Filter out markers with IDs >= 30 and those more than 2m away
-        disp(marker_nums);
-        valid_markers = (marker_nums < 30) & (vecnorm(landmark_centres(1:2)) <= 2);
+        valid_markers = (marker_nums < 30) & (vecnorm(landmark_centres(:,1:2), 2, 2) <= 2);
         marker_nums = marker_nums(valid_markers);
         
         landmark_centres = landmark_centres(valid_markers, 1:2)';
@@ -119,8 +109,8 @@ for i = 1:num_entries
     current_robot_path = [current_robot_path; robot_pos(1:2)'];  % Assuming robot_pos has at least 2 elements
     set(robotPathPlot, 'XData', current_robot_path(:,1), 'YData', current_robot_path(:,2));
     
-    % Update landmarks plot
-    for j = 1:size(landmarks_pos, 2)
+    % Update landmarks plot with ellipses and marker IDs
+    for j = 1:size(landmarks_pos, 2)  % Renamed loop variable to 'j'
         if isempty(landmarkPlots{j}) || ~isvalid(landmarkPlots{j})
             landmarkPlots{j} = plot(NaN, NaN, 'Color', lm_cmap(j,:), 'LineWidth', 2);
         end
@@ -133,8 +123,25 @@ for i = 1:num_entries
         
         % Update ellipse plot
         set(landmarkPlots{j}, 'XData', ellipse_x, 'YData', ellipse_y);
+        
+        % Get the marker ID from EKF's idx2num mapping
+        marker_id = EKF.idx2num(j);
+        
+        % Initialize and update text labels for marker IDs
+        if isempty(landmarkTexts{j}) || ~isvalid(landmarkTexts{j})
+            % Create a new text object with a slight offset for readability
+            offset = 0.1;  % Adjust as needed based on scale
+            landmarkTexts{j} = text(landmarks_pos(1,j) + offset, landmarks_pos(2,j) + offset, ...
+                                     num2str(marker_id), ...
+                                     'Color', lm_cmap(j,:), 'FontSize', 12, 'FontWeight', 'bold', ...
+                                     'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom');
+        else
+            % Update existing text object
+            set(landmarkTexts{j}, 'Position', landmarks_pos(1:2,j)' + [0.1, 0.1], ...
+                                     'String', num2str(marker_id));
+        end
     end
-    
+
     drawnow;
     
     % Get the idx2num array from EKF
@@ -167,10 +174,7 @@ for i = 1:num_entries
         belowThresholdCount = 0; % Reset if the count is above threshold
     end
     
-    % Control Logic (Modify as needed based on dataset or application)
-    if current_time > end_time
-        break;
-    elseif belowThresholdCount <= consecutiveThreshold
+    if belowThresholdCount <= consecutiveThreshold
         % Follow line iteration (You might need to adjust this function)
         [u, q, wl, wr] = followLineIteration(height, width, bottom_third_bin_img);
     else
@@ -190,24 +194,17 @@ for i = 1:num_entries
 
         % Calculate the actual velocities after rounding
         [u, q] = forward_kinematics(wl, wr);
+
     end
 end
-
-% END LINE FOLLOW
-% Since there's no robot, no need to stop it
-% pb.stop();
 
 % Save visualization data to a file
 save('visualization_data.mat', 'vis_data');
 
-% Save the processed dataset if needed
-% save('test_dataset_processed.mat', 'test_dataset');  % Optional
-
 % Evaluate landmark estimates
-rms_error = evaluate_landmarks(vis_data, false);  % Adjust the parameters as needed
+[rms_error, R, t] = evaluate_landmarks(vis_data, false);  % Adjust the parameters as needed
 disp("Landmark position RMS error: ");
 disp(rms_error);
 
 % Plot the trajectory
-plot_trajectory(vis_data);
-
+plot_trajectory(vis_data, R, t);

@@ -16,15 +16,15 @@ marker_length = 0.075;
 cameraParams = calibrationSession.CameraParameters;
 
 simulation = false;
-end_time = 120;
+end_time = 240;
 
-save_data = true;
-
+save_data = false;
+demo = true;
 % Initialize the pibot connection
 
 if simulation
     % Load true landmarks from a JSON file
-    fid = fopen('groundtruth_1016.json');
+    fid = fopen('groundtruths/groundtruth_1016.json');
     raw = fread(fid, inf);
     str = char(raw');
     fclose(fid);
@@ -43,8 +43,22 @@ if simulation
     % Start by placing your robot at the start of the line
     pb.place([1;1], 0);
     pb.showLandmarks(true);
+    
 else
     pb = PiBot('192.168.50.1');
+
+    if demo
+        % Load true landmarks from a JSON file
+        fid = fopen('groundtruth_demo.json');
+        raw = fread(fid, inf);
+        str = char(raw');
+        fclose(fid);
+        json_data = jsondecode(str);
+    
+        field_names = fieldnames(json_data);
+        ground_truth_landmark_nums = cellfun(@(x) str2double(x(2:end)), field_names);
+        % disp(ground_truth_landmark_nums)
+    end
 end
 
 % Initialise your EKF class
@@ -73,8 +87,8 @@ trackPlot = plot(x_path, y_path, 'k-', 'LineWidth', 2);
 robotPathPlot = plot(0, 0, 'g-', 'LineWidth', 1.5);
 
 axis equal;
-xlim([min(x_path)-2, max(x_path)+2]);
-ylim([min(y_path)-2, max(y_path)+2]);
+xlim([min(x_path)-1, max(x_path)+1]);
+ylim([min(y_path)-1, max(y_path)+1]);
 grid on;
 title('Robot Path, Landmark Positions, and Track');
 xlabel('X (m)');
@@ -126,7 +140,12 @@ while(true)
 
     if ~isempty(marker_nums)
         % Filter out markers with IDs >= 30 and those more than 2m away
-        valid_markers = (marker_nums < 30) & (vecnorm(landmark_centres(1:2)) <= 2);
+        % valid_markers = (marker_nums < 30) & (vecnorm(landmark_centres(1:2)) <= 2);
+
+        % filter out markers with IDs not in ground truth
+        valid_markers = ismember(marker_nums, ground_truth_landmark_nums);
+        disp(valid_markers);
+        
         marker_nums = marker_nums(valid_markers);
         
         if simulation
@@ -157,19 +176,37 @@ while(true)
 
     set(robotPathPlot, 'XData', robot_path_x, 'YData', robot_path_y);
 
-    for i = 1:size(landmarks_pos, 2)
-        if isempty(landmarkPlots{i}) || ~isvalid(landmarkPlots{i})
-            landmarkPlots{i} = plot(NaN, NaN, 'Color', lm_cmap(i,:), 'LineWidth', 2);
+    % Update landmarks plot with ellipses and marker IDs
+    for j = 1:size(landmarks_pos, 2)  % Renamed loop variable to 'j'
+        if isempty(landmarkPlots{j}) || ~isvalid(landmarkPlots{j})
+            landmarkPlots{j} = plot(NaN, NaN, 'Color', lm_cmap(j,:), 'LineWidth', 2);
         end
             
         % Extract landmark covariance
-        landmark_cov_i = landmarks_cov(2*i-1:2*i, 2*i-1:2*i);
+        landmark_cov_i = landmarks_cov(2*j-1:2*j, 2*j-1:2*j);
         
         % Calculate ellipse parameters
-        [ellipse_x, ellipse_y] = error_ellipse(landmarks_pos(:,i), landmark_cov_i);
+        [ellipse_x, ellipse_y] = error_ellipse(landmarks_pos(:,j), landmark_cov_i);
         
         % Update ellipse plot
-        set(landmarkPlots{i}, 'XData', ellipse_x, 'YData', ellipse_y);
+        set(landmarkPlots{j}, 'XData', ellipse_x, 'YData', ellipse_y);
+        
+        % Get the marker ID from EKF's idx2num mapping
+        marker_id = EKF.idx2num(j);
+        
+        % Initialize and update text labels for marker IDs
+        if isempty(landmarkTexts{j}) || ~isvalid(landmarkTexts{j})
+            % Create a new text object with a slight offset for readability
+            offset = 0.1;  % Adjust as needed based on scale
+            landmarkTexts{j} = text(landmarks_pos(1,j) + offset, landmarks_pos(2,j) + offset, ...
+                                     num2str(marker_id), ...
+                                     'Color', lm_cmap(j,:), 'FontSize', 12, 'FontWeight', 'bold', ...
+                                     'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom');
+        else
+            % Update existing text object
+            set(landmarkTexts{j}, 'Position', landmarks_pos(1:2,j)' + [0.1, 0.1], ...
+                                     'String', num2str(marker_id));
+        end
     end
 
     drawnow;
@@ -205,27 +242,6 @@ while(true)
         belowThresholdCount = 0; % Reset if the count is above threshold
     end
 
-    % Check if the robot has reached the end of the line
-   %  if current_time < 5
-   %      u = 0;
-   %      q = 0;
-   %      % Calculate wheel velocities using inverse kinematics
-   %      [wl, wr] = inverse_kinematics(u, q);
-   %  elseif current_time < 7
-   %      u = 0;
-   %      q = 0.4;
-   %      % Calculate wheel velocities using inverse kinematics
-   %      [wl, wr] = inverse_kinematics(u, q);
-   %  elseif current_time < 11
-   %      u = 0;
-   %      q = -0.4;
-   %      % Calculate wheel velocities using inverse kinematics
-   %      [wl, wr] = inverse_kinematics(u, q);
-   % elseif current_time < 13
-   %      u = 0;
-   %      q = 0.4;
-   %      % Calculate wheel velocities using inverse kinematics
-   %      [wl, wr] = inverse_kinematics(u, q);
 
     if current_time > end_time
         break;
@@ -269,9 +285,14 @@ if save_data
 end
 
 % evaluate landmark estimates
-rms_error = evaluate_landmarks(vis_data, simulation);
+if simulation
+    [rms_error, R, t] = evaluate_landmarks(vis_data, simulation, pb);
+else
+    [rms_error, R, t] = evaluate_landmarks(vis_data, simulation);
+end
+
 disp("Landmark position RMS error: ");
 disp(rms_error);
 
 % plot the trajectory
-plot_trajectory(vis_data);
+plot_trajectory(vis_data, R, t);
